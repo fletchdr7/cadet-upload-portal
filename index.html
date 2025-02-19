@@ -1,48 +1,140 @@
-<div class="container">
-    <h2 class="text-center">Upload Cadet Data</h2>
-    <form id="uploadForm">
-        <div class="mb-3">
-            <label for="detachmentId" class="form-label">Detachment ID:</label>
-            <input type="text" class="form-control" id="detachmentId" placeholder="Enter Detachment ID" required>
-        </div>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cadet Data Upload</title>
 
-        <div class="mb-3">
-            <label for="category" class="form-label">Category:</label>
-            <select class="form-select" id="category">
-                <option value="smr">SMR Upload</option>
-                <option value="dfas">DFAS Upload</option>
-            </select>
-        </div>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+        .container {
+            max-width: 500px;
+            margin-top: 50px;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+        }
+        .btn-primary, .btn-secondary {
+            width: 100%;
+        }
+        #status {
+            margin-top: 15px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2 class="text-center">Upload Cadet Data</h2>
+        <form id="uploadForm">
+            <div class="mb-3">
+                <label for="detachmentId" class="form-label">Detachment ID:</label>
+                <input type="text" class="form-control" id="detachmentId" placeholder="Enter Detachment ID" required>
+            </div>
 
-        <div class="mb-3">
-            <label for="fileInput" class="form-label">Select File:</label>
-            <input type="file" class="form-control" id="fileInput" required>
-        </div>
+            <div class="mb-3">
+                <label for="category" class="form-label">Category:</label>
+                <select class="form-select" id="category">
+                    <option value="smr">SMR Upload</option>
+                    <option value="dfas">DFAS Upload</option>
+                </select>
+            </div>
 
-        <button type="button" class="btn btn-primary" onclick="uploadFile()">Upload</button>
-        <p id="status" class="text-center"></p>
-    </form>
+            <div class="mb-3">
+                <label for="fileInput" class="form-label">Select File:</label>
+                <input type="file" class="form-control" id="fileInput" required>
+            </div>
 
-    <!-- Embedded Dashboard -->
-    <h3 class="text-center mt-5">📊 Cadet Data Dashboard</h3>
-    <iframe id="dashboardFrame" width="100%" height="600px" style="border: none;"></iframe>
-</div>
+            <button type="button" class="btn btn-primary" onclick="uploadFile()">Upload</button>
+            <p id="status" class="text-center"></p>
 
-<script>
-    function loadDashboard() {
-        const detachmentId = document.getElementById("detachmentId").value;
-        if (!detachmentId) {
-            alert("❌ Please enter a Detachment ID to view the dashboard.");
-            return;
+            <!-- QuickSight Dashboard Button -->
+            <button id="dashboardButton" class="btn btn-secondary mt-3" onclick="openDashboard()">📊 View Dashboard</button>
+        </form>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        async function uploadFile() {
+            const detachmentId = document.getElementById("detachmentId").value;
+            const category = document.getElementById("category").value;
+            const fileInput = document.getElementById("fileInput");
+            const statusText = document.getElementById("status");
+
+            if (!detachmentId || !fileInput.files.length) {
+                statusText.textContent = "❌ Please enter a Detachment ID and select a file.";
+                statusText.classList.add("text-danger");
+                return;
+            }
+
+            const file = fileInput.files[0];
+            statusText.textContent = "🔄 Requesting pre-signed URL...";
+            statusText.classList.remove("text-danger", "text-success");
+
+            try {
+                // Step 1: Request a pre-signed URL
+                const response = await fetch("https://jk2q5dvl0b.execute-api.us-east-1.amazonaws.com/generate-upload-url", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ 
+                        file_name: file.name, 
+                        detachment_id: detachmentId,
+                        category: category
+                    })
+                });
+
+                const data = await response.json();
+                if (!data.upload_url) {
+                    statusText.textContent = "❌ Error getting upload URL.";
+                    statusText.classList.add("text-danger");
+                    return;
+                }
+
+                // Step 2: Upload file to S3
+                statusText.textContent = "🔼 Uploading file...";
+                const uploadResponse = await fetch(data.upload_url, {
+                    method: "PUT",
+                    body: file,
+                    headers: { "Content-Type": "application/octet-stream" }
+                });
+
+                if (uploadResponse.ok) {
+                    statusText.textContent = "✅ File uploaded successfully!";
+                    statusText.classList.add("text-success");
+                } else {
+                    statusText.textContent = "❌ Upload failed!";
+                    statusText.classList.add("text-danger");
+                }
+            } catch (error) {
+                statusText.textContent = "❌ An error occurred.";
+                statusText.classList.add("text-danger");
+                console.error("Error:", error);
+            }
         }
 
-        // Construct the QuickSight Embed URL with the Detachment ID filter
-        const quickSightBaseUrl = "https://us-east-1.quicksight.aws.amazon.com/sn/accounts/904233093918/dashboards/67e26f37-748e-44cb-a654-6a337d32312d?directory_alias=arrowbaysolutions";
-        const filteredUrl = `${quickSightBaseUrl}&p.DetachmentID=${detachmentId}`;
+        function openDashboard() {
+            const detachmentId = document.getElementById("detachmentId").value;
+            if (!detachmentId) {
+                alert("❌ Please enter a Detachment ID before viewing the dashboard.");
+                return;
+            }
 
-        // Load the filtered dashboard into the iframe
-        document.getElementById("dashboardFrame").src = filteredUrl;
-    }
+            // Base QuickSight Dashboard URL
+            const baseUrl = "https://us-east-1.quicksight.aws.amazon.com/sn/accounts/904233093918/dashboards/67e26f37-748e-44cb-a654-6a337d32312d?directory_alias=arrowbaysolutions";
 
-    document.getElementById("detachmentId").addEventListener("change", loadDashboard);
-</script>
+            // Append Detachment ID as a parameter
+            const dashboardUrl = `${baseUrl}&p.DetachmentID=${detachmentId}`;
+
+            // Open the QuickSight Dashboard in a new tab
+            window.open(dashboardUrl, "_blank");
+        }
+    </script>
+</body>
+</html>
