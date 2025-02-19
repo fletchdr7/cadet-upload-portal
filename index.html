@@ -54,11 +54,7 @@
             <p id="status" class="text-center"></p>
 
             <!-- QuickSight Dashboard Button -->
-            <a href="https://us-east-1.quicksight.aws.amazon.com/sn/accounts/904233093918/dashboards/67e26f37-748e-44cb-a654-6a337d32312d?directory_alias=arrowbaysolutions" 
-               class="btn btn-secondary mt-3" 
-               target="_blank">
-               📊 View Dashboard
-            </a>
+            <button id="dashboardButton" class="btn btn-secondary mt-3" onclick="openDashboard()">📊 View Dashboard</button>
         </form>
     </div>
 
@@ -121,6 +117,23 @@
                 statusText.classList.add("text-danger");
                 console.error("Error:", error);
             }
+        }
+
+        function openDashboard() {
+            const detachmentId = document.getElementById("detachmentId").value;
+            if (!detachmentId) {
+                alert("❌ Please enter a Detachment ID before viewing the dashboard.");
+                return;
+            }
+
+            // Base QuickSight Dashboard URL
+            const baseUrl = "https://us-east-1.quicksight.aws.amazon.com/sn/accounts/904233093918/dashboards/67e26f37-748e-44cb-a654-6a337d32312d?directory_alias=arrowbaysolutions";
+
+            // Append Detachment ID as a parameter
+            const dashboardUrl = `${baseUrl}&p.DetachmentID=${detachmentId}`;
+
+            // Open the QuickSight Dashboard in a new tab
+            window.open(dashboardUrl, "_blank");
         }
     </script>
 </body>
